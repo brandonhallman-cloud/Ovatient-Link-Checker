@@ -213,6 +213,17 @@ def send_email(html_body, subject):
         )
 
 
+def short_url_label(url, max_len=60):
+    """
+    Long query strings (common in scheduling-widget URLs) blow out table
+    width and push the Status column off-screen. Show a short label as the
+    link text while keeping the full URL as the actual href.
+    """
+    if len(url) <= max_len:
+        return f"[{url}]({url})"
+    return f"[{url[:max_len]}…]({url})"
+
+
 def write_step_summary(results):
     """
     Writes a formatted report to the GitHub Actions run summary page
@@ -240,7 +251,9 @@ def write_step_summary(results):
         for r in broken:
             status = r["status_code"] if r["status_code"] else "No response"
             err = f" — {r['error']}" if r["error"] else ""
-            lines.append(f"| {r['sheet']} | {r['cell']} | {r['url']} | {status}{err} |")
+            lines.append(
+                f"| {r['sheet']} | {r['cell']} | {short_url_label(r['url'])} | {status}{err} |"
+            )
     else:
         lines.append(f"### ✅ All {total} links working")
 
@@ -253,7 +266,9 @@ def write_step_summary(results):
         for r in results:
             icon = "✅" if r["ok"] else "❌"
             status = r["status_code"] if r["status_code"] else "No response"
-            lines.append(f"| {icon} | {r['sheet']} | {r['cell']} | {r['url']} | {status} |")
+            lines.append(
+                f"| {icon} | {r['sheet']} | {r['cell']} | {short_url_label(r['url'])} | {status} |"
+            )
         lines.append("")
         lines.append("</details>")
 
