@@ -1,0 +1,33 @@
+name: Daily Link Check
+
+on:
+  schedule:
+    # Runs at 8:00 AM UTC every day. Edit the cron below to change the time.
+    # Cron is always in UTC - convert your local time.
+    - cron: "0 8 * * *"
+  workflow_dispatch: {}   # lets you trigger it manually from the Actions tab
+
+jobs:
+  check-links:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run link checker
+        env:
+          EXCEL_FILE_PATH: ${{ vars.EXCEL_FILE_PATH || 'links.xlsx' }}
+          GRAPH_TENANT_ID: ${{ secrets.GRAPH_TENANT_ID }}
+          GRAPH_CLIENT_ID: ${{ secrets.GRAPH_CLIENT_ID }}
+          GRAPH_CLIENT_SECRET: ${{ secrets.GRAPH_CLIENT_SECRET }}
+          GRAPH_SENDER_EMAIL: ${{ secrets.GRAPH_SENDER_EMAIL }}
+          REPORT_RECIPIENT: ${{ secrets.REPORT_RECIPIENT }}
+        run: python link_checker.py
