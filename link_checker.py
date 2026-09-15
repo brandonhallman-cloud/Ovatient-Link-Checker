@@ -213,6 +213,54 @@ def send_email(html_body, subject):
         )
 
 
+def write_step_summary(results):
+    """
+    Writes a formatted report to the GitHub Actions run summary page
+    (the "Summary" tab you see when you open a workflow run). No-ops when
+    not running inside GitHub Actions.
+    """
+    summary_path = os.environ.get("GITHUB_STEP_SUMMARY")
+    if not summary_path:
+        return
+
+    date_str = datetime.now().strftime("%A, %B %d, %Y")
+    total = len(results)
+    broken = [r for r in results if not r["ok"]]
+    ok = total - len(broken)
+
+    lines = [f"## 🔗 Daily Link Check — {date_str}", ""]
+
+    if total == 0:
+        lines.append("No links were found in the workbook.")
+    elif broken:
+        lines.append(f"### ❌ {len(broken)} broken link(s) found ({ok}/{total} OK)")
+        lines.append("")
+        lines.append("| Sheet | Cell | URL | Status |")
+        lines.append("|---|---|---|---|")
+        for r in broken:
+            status = r["status_code"] if r["status_code"] else "No response"
+            err = f" — {r['error']}" if r["error"] else ""
+            lines.append(f"| {r['sheet']} | {r['cell']} | {r['url']} | {status}{err} |")
+    else:
+        lines.append(f"### ✅ All {total} links working")
+
+    if results:
+        lines.append("")
+        lines.append("<details><summary>Show all links checked</summary>")
+        lines.append("")
+        lines.append("| | Sheet | Cell | URL | Status |")
+        lines.append("|---|---|---|---|---|")
+        for r in results:
+            icon = "✅" if r["ok"] else "❌"
+            status = r["status_code"] if r["status_code"] else "No response"
+            lines.append(f"| {icon} | {r['sheet']} | {r['cell']} | {r['url']} | {status} |")
+        lines.append("")
+        lines.append("</details>")
+
+    with open(summary_path, "a", encoding="utf-8") as f:
+        f.write("\n".join(lines) + "\n")
+
+
 def main():
     excel_path = os.environ.get("EXCEL_FILE_PATH", "links.xlsx")
 
@@ -224,12 +272,14 @@ def main():
     links = extract_links_from_excel(excel_path)
     print(f"Found {len(links)} link(s). Checking...")
 
-    if not links:
-        html = "<p>No links were found in the workbook.</p>"
-        broken_count = 0
-    else:
-        results = check_all_links(links)
-        html, broken_count = build_report_html(results)
+    results = check_all_links(links) if links else []
+    html, broken_count = build_report_html(results) if results else (
+        "<p>No links were found in the workbook.</p>", 0
+    )
+
+    # Write the dashboard summary first, so you see results in the Actions
+    # tab even if the email step below fails.
+    write_step_summary(results)
 
     subject = (
         f"⚠️ Link Check: {broken_count} broken link(s)"
