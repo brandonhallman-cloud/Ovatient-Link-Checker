@@ -70,20 +70,27 @@ def extract_links_from_excel(path):
 def check_link(entry):
     """Check one link, return entry enriched with status info."""
     url = entry["url"]
-    headers = {"User-Agent": "Mozilla/5.0 (LinkChecker/1.0)"}
+    headers = {
+        "User-Agent": (
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+            "(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+        ),
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.9",
+    }
     try:
-        resp = requests.head(
-            url, allow_redirects=True, timeout=REQUEST_TIMEOUT, headers=headers
+        # Use GET, not HEAD: some servers (including this workbook's
+        # scheduling-widget links) don't implement HEAD properly and throw
+        # a 500 instead of a clean 4xx. A real browser only ever sends GET,
+        # so GET is what actually matches what "does this link work" means.
+        resp = requests.get(
+            url, allow_redirects=True, timeout=REQUEST_TIMEOUT, headers=headers,
+            stream=True,
         )
-        # Some servers don't support HEAD properly (405/403) - fall back to GET
-        if resp.status_code in (405, 403, 501):
-            resp = requests.get(
-                url, allow_redirects=True, timeout=REQUEST_TIMEOUT, headers=headers,
-                stream=True,
-            )
         entry["status_code"] = resp.status_code
         entry["ok"] = resp.ok
         entry["error"] = None
+        resp.close()
     except requests.exceptions.RequestException as exc:
         entry["status_code"] = None
         entry["ok"] = False
